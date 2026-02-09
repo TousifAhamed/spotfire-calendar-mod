@@ -1,0 +1,47 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Start watchers",
+            "dependsOn": ["TypeScript watch", "Build watcher", "Dev server"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "TypeScript watch",
+            "type": "shell",
+            "command": "npx tsc --noEmit --watch",
+            "isBackground": true,
+            "problemMatcher": "$tsc-watch",
+            "presentation": {
+                "group": "watchers",
+                "reveal": "never"
+            }
+        },
+        {
+            "label": "Build watcher",
+            "type": "shell",
+            "command": "npm run start",
+            "isBackground": true,
+            "problemMatcher": [],
+            "presentation": {
+                "group": "watchers",
+                "reveal": "always"
+            }
+        },
+        {
+            "label": "Dev server",
+            "type": "shell",
+            "command": "npm run server",
+            "isBackground": true,
+            "problemMatcher": [],
+            "presentation": {
+                "group": "watchers",
+                "reveal": "always"
+            }
+        }
+    ]
+}

@@ -1,0 +1,21 @@
+{
+    "compilerOptions": {
+        "target": "ES2018",
+        "module": "ESNext",
+        "moduleResolution": "node",
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "outDir": "./build",
+        "rootDir": "./src",
+        "sourceMap": true,
+        "declaration": false,
+        "noEmit": true,
+        "allowUmdGlobalAccess": true,
+        "lib": ["ES2018", "DOM", "DOM.Iterable"],
+        "types": ["d3"]
+    },
+    "include": ["src/**/*", "node_modules/@spotfire/mods-api/visualization-mods/api.d.ts"],
+    "exclude": ["build"]
+}

@@ -1,0 +1,8 @@
+{
+    "json.schemas": [
+        {
+            "fileMatch": ["mod-manifest.json"],
+            "url": "https://spotfiresoftware.github.io/spotfire-mods/schemas/mod-manifest-v2.json"
+        }
+    ]
+}

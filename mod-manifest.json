@@ -1,0 +1,74 @@
+{
+    "apiVersion": "1.3",
+    "version": "1.0.0",
+    "name": "Calendar Chart",
+    "id": "spotfire-calendar-mod",
+    "icon": "icon.svg",
+    "files": [
+        "index.html",
+        "main.css",
+        "build/main.js"
+    ],
+    "externalResources": [],
+    "properties": [
+        {
+            "name": "colorScheme",
+            "type": "string",
+            "defaultValue": "PiYG"
+        },
+        {
+            "name": "weekStart",
+            "type": "string",
+            "defaultValue": "sunday"
+        },
+        {
+            "name": "showMonthLabels",
+            "type": "boolean",
+            "defaultValue": true
+        },
+        {
+            "name": "showDayLabels",
+            "type": "boolean",
+            "defaultValue": true
+        },
+        {
+            "name": "customMinColor",
+            "type": "string",
+            "defaultValue": ""
+        },
+        {
+            "name": "customMaxColor",
+            "type": "string",
+            "defaultValue": ""
+        },
+        {
+            "name": "hiddenDays",
+            "type": "string",
+            "defaultValue": ""
+        },
+        {
+            "name": "showWeekNumbers",
+            "type": "boolean",
+            "defaultValue": false
+        }
+    ],
+    "dataViewDefinition": {
+        "axes": [
+            {
+                "name": "Date",
+                "mode": "categorical",
+                "placement": "bottom"
+            },
+            {
+                "name": "Value",
+                "mode": "continuous",
+                "placement": "left"
+            },
+            {
+                "name": "ColorBy",
+                "mode": "dual",
+                "placement": "none"
+            }
+        ]
+    }
+}
