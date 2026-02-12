@@ -275,13 +275,17 @@ Spotfire.initialize(async (mod: Spotfire.Mod) => {
         const panel = document.createElement("div");
         panel.className = "settings-panel";
 
+        const containerWidth = Math.max(0, Math.floor(container.getBoundingClientRect().width));
+        const maxPanelWidth = containerWidth > 0 ? Math.max(180, containerWidth - 40) : 320;
+        const minPanelWidth = Math.min(260, maxPanelWidth);
+
         const bgColor = styling.isDarkTheme ? "#2d2d2d" : "#ffffff";
         const borderColor = styling.isDarkTheme ? "#555" : "#ccc";
         const textColor = styling.fontColor;
         panel.style.cssText = `
             position: absolute; top: 4px; right: 30px; z-index: 100;
             background: ${bgColor}; border: 1px solid ${borderColor}; border-radius: 6px;
-            padding: 12px 16px; min-width: 260px; max-height: 90vh; overflow-y: auto;
+            padding: 12px 16px; min-width: ${minPanelWidth}px; max-width: ${maxPanelWidth}px; box-sizing: border-box; max-height: 90vh; overflow-y: auto;
             font-family: ${styling.fontFamily}; font-size: 12px; color: ${textColor};
             box-shadow: 0 4px 16px rgba(0,0,0,0.2);
         `;

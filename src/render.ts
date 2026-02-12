@@ -77,14 +77,13 @@ export function renderCalendar(
     mod: Spotfire.Mod,
     dataView: Spotfire.DataView
 ): void {
-    // ─── Layout constants ──────────────────────────────────────────
-    const cellSize = computeCellSize(config);
-    const cellPadding = 1.5;
+    // ─── Layout constants (static) ─────────────────────────────────
     const yearLabelWidth = config.showDayLabels ? 45 : 10;
     const monthLabelHeight = config.showMonthLabels ? 18 : 0;
     const weekNumberHeight = config.showWeekNumbers ? 14 : 0;
     const topLabelHeight = monthLabelHeight + weekNumberHeight;
     const dayLabelWidth = config.showDayLabels ? 20 : 0;
+    // Legend uses ~30px vertical space (12px bar + padding/margins)
     const legendHeight = 30;
 
     // Compute visible day indices (in week-order, not hidden)
@@ -92,16 +91,32 @@ export function renderCalendar(
         ? [1, 2, 3, 4, 5, 6, 0]  // Mon..Sun as JS day indices
         : [0, 1, 2, 3, 4, 5, 6]; // Sun..Sat
     const visibleDayIndices = allDayIndicesInOrder.filter(d => !config.hiddenDays.has(d));
-    const visibleDayCount = visibleDayIndices.length;
-    const daysInWeek = 7;
+    const visibleDayCount = visibleDayIndices.length || 1; // Ensure at least 1 to avoid division by zero
     const weeksInYear = 53;
-
-    const yearHeight = cellSize * visibleDayCount + topLabelHeight + 8;
-    const chartWidth = yearLabelWidth + dayLabelWidth + (cellSize + cellPadding) * weeksInYear + 10;
 
     // ─── Group data by year ────────────────────────────────────────
     const yearGroups = groupByYear(data);
-    const totalHeight = yearGroups.length * yearHeight + legendHeight + 10;
+    const yearCount = Math.max(1, yearGroups.length);
+
+    // Compute cell dimensions - separate width and height for independent scaling
+    const { cellWidth, cellHeight } = computeCellDimensions({
+        width: config.width,
+        height: config.height,
+        weeksInYear,
+        yearLabelWidth,
+        dayLabelWidth,
+        legendHeight,
+        topLabelHeight,
+        yearCount,
+        visibleDayCount
+    });
+
+    // Cell padding scales with the smaller dimension
+    const cellPadding = Math.max(0.5, Math.min(2, Math.min(cellWidth, cellHeight) * 0.1));
+
+    const yearHeight = cellHeight * visibleDayCount + topLabelHeight + 8;
+    const chartWidth = yearLabelWidth + dayLabelWidth + cellWidth * weeksInYear + 10;
+    const totalHeight = yearCount * yearHeight + legendHeight + 10;
 
     // ─── Color scale ───────────────────────────────────────────────
     const allValues = data.map((d) => d.value);
@@ -114,10 +129,13 @@ export function renderCalendar(
         .select(container)
         .append("svg")
         .attr("xmlns", "http://www.w3.org/2000/svg")
-        .attr("width", Math.max(chartWidth, config.width))
-        .attr("height", Math.max(totalHeight, config.height))
-        .attr("viewBox", `0 0 ${Math.max(chartWidth, config.width)} ${Math.max(totalHeight, config.height)}`)
-        .attr("style", `max-width: 100%; height: auto; background-color: ${styling.backgroundColor}; font-family: ${styling.fontFamily};`);
+        .attr("width", config.width)
+        .attr("height", config.height)
+        .attr("viewBox", `0 0 ${config.width} ${config.height}`)
+        .attr("style", `background-color: ${styling.backgroundColor}; font-family: ${styling.fontFamily}; display: block;`);
+    
+    // Main group (no offset - chart fills available space)
+    const mainG = svg.append("g");
 
     // ─── Helper functions for week day count ───────────────────────
     const timeWeek = config.weekStart === "monday" ? d3.utcMonday : d3.utcSunday;
@@ -149,7 +167,7 @@ export function renderCalendar(
 
     // ─── Render each year ──────────────────────────────────────────
     yearGroups.forEach((yearGroup, yi) => {
-        const yearG = svg
+        const yearG = mainG
             .append("g")
             .attr("transform", `translate(${yearLabelWidth}, ${yi * yearHeight + legendHeight + 5})`);
 
@@ -158,7 +176,7 @@ export function renderCalendar(
             .append("text")
             .attr("class", "year-label")
             .attr("x", -yearLabelWidth + 4)
-            .attr("y", topLabelHeight + (visibleDayCount * cellSize) / 2)
+            .attr("y", topLabelHeight + (visibleDayCount * cellHeight) / 2)
             .attr("dy", "0.35em")
             .attr("font-size", `${styling.fontSize}px`)
             .attr("fill", styling.fontColor)
@@ -174,7 +192,7 @@ export function renderCalendar(
                         .append("text")
                         .attr("class", "day-label")
                         .attr("x", dayLabelWidth - 4)
-                        .attr("y", topLabelHeight + vi * cellSize + cellSize / 2)
+                        .attr("y", topLabelHeight + vi * cellHeight + cellHeight / 2)
                         .attr("dy", "0.35em")
                         .attr("text-anchor", "end")
                         .attr("fill", styling.fontColor)
@@ -212,10 +230,10 @@ export function renderCalendar(
                 if (dp && config.hasMarkedRows && !dp.isMarked) cls += " dimmed";
                 return cls;
             })
-            .attr("width", cellSize - cellPadding)
-            .attr("height", cellSize - cellPadding)
-            .attr("x", (d) => timeWeek.count(d3.utcYear(d), d) * cellSize)
-            .attr("y", (d) => countDay(d.getUTCDay()) * cellSize)
+            .attr("width", Math.max(1, cellWidth - cellPadding))
+            .attr("height", Math.max(1, cellHeight - cellPadding))
+            .attr("x", (d) => timeWeek.count(d3.utcYear(d), d) * cellWidth)
+            .attr("y", (d) => countDay(d.getUTCDay()) * cellHeight)
             .attr("rx", 2)
             .attr("ry", 2)
             .attr("fill", (d) => {
@@ -293,10 +311,10 @@ export function renderCalendar(
                     // Find all cells within the selection rectangle
                     const rowsToMark: Spotfire.DataViewRow[] = [];
                     cells.each(function (d: Date) {
-                        const cx = timeWeek.count(d3.utcYear(d), d) * cellSize;
-                        const cy = countDay(d.getUTCDay()) * cellSize;
-                        const cellCenterX = cx + (cellSize - cellPadding) / 2;
-                        const cellCenterY = cy + (cellSize - cellPadding) / 2;
+                        const cx = timeWeek.count(d3.utcYear(d), d) * cellWidth;
+                        const cy = countDay(d.getUTCDay()) * cellHeight;
+                        const cellCenterX = cx + (cellWidth - cellPadding) / 2;
+                        const cellCenterY = cy + (cellHeight - cellPadding) / 2;
                         if (cellCenterX >= x1 && cellCenterX <= x2 && cellCenterY >= y1 && cellCenterY <= y2) {
                             const key = dateKey(d);
                             const dp = yearGroup.dataMap.get(key);
@@ -342,7 +360,7 @@ export function renderCalendar(
             .append("path")
             .attr("class", "month-path")
             .attr("stroke", styling.lineColor)
-            .attr("d", (t) => pathMonth(t, cellSize, visibleDayCount, countDay, timeWeek, visibleDayIndices));
+            .attr("d", (t) => pathMonth(t, cellWidth, cellHeight, visibleDayCount, countDay, timeWeek, visibleDayIndices));
 
         // Month labels along the top
         if (config.showMonthLabels) {
@@ -355,7 +373,7 @@ export function renderCalendar(
                 monthLabelG
                     .append("text")
                     .attr("class", "month-label")
-                    .attr("x", weekOffset * cellSize + 2)
+                    .attr("x", weekOffset * cellWidth + 2)
                     .attr("y", monthLabelHeight - 4)
                     .attr("fill", styling.fontColor)
                     .attr("font-size", `${Math.max(9, styling.fontSize - 2)}px`)
@@ -389,7 +407,7 @@ export function renderCalendar(
                 weekNumG
                     .append("text")
                     .attr("class", "week-number")
-                    .attr("x", w * cellSize + (cellSize - cellPadding) / 2)
+                    .attr("x", w * cellWidth + (cellWidth - cellPadding) / 2)
                     .attr("y", weekNumberHeight - 2)
                     .attr("text-anchor", "middle")
                     .attr("fill", styling.fontColor)
@@ -401,7 +419,7 @@ export function renderCalendar(
     });
 
     // ─── Color Legend ──────────────────────────────────────────────
-    renderLegend(svg, allValues, colorScale, config, chartWidth, data, styling);
+    renderLegend(mainG, allValues, colorScale, config, chartWidth, data, styling);
 
     // ─── Background click to clear marking ─────────────────────────
     svg.on("click", function (event: MouseEvent) {
@@ -412,13 +430,56 @@ export function renderCalendar(
 }
 
 /**
- * Compute optimal cell size based on available window dimensions.
+ * Compute optimal cell dimensions based on available window dimensions.
+ * Returns separate width and height to allow cells to stretch independently.
  */
-function computeCellSize(config: CalendarConfig): number {
-    // Aim for reasonable cell size that fits the window width
-    const availableWidth = config.width - 80; // margins
-    const idealSize = Math.floor(availableWidth / 55); // ~53 weeks + padding
-    return Math.max(8, Math.min(18, idealSize));
+function computeCellDimensions(args: {
+    width: number;
+    height: number;
+    weeksInYear: number;
+    yearLabelWidth: number;
+    dayLabelWidth: number;
+    legendHeight: number;
+    topLabelHeight: number;
+    yearCount: number;
+    visibleDayCount: number;
+}): { cellWidth: number; cellHeight: number } {
+    const {
+        width,
+        height,
+        weeksInYear,
+        yearLabelWidth,
+        dayLabelWidth,
+        legendHeight,
+        topLabelHeight,
+        yearCount,
+        visibleDayCount
+    } = args;
+
+    const minCell = 1;
+    const maxCell = 100;
+
+    const rightPadding = 10;
+    const verticalPadding = 10;
+    const perYearFixed = topLabelHeight + 8;
+
+    // Calculate cell width to fill available horizontal space
+    const availableWidth = width - yearLabelWidth - dayLabelWidth - rightPadding;
+    let cellWidth = (Number.isFinite(availableWidth) && availableWidth > 0)
+        ? ((availableWidth - 2) / weeksInYear)
+        : maxCell;
+    cellWidth = Math.max(minCell, Math.min(maxCell, cellWidth));
+    if (!Number.isFinite(cellWidth)) cellWidth = minCell;
+
+    // Calculate cell height to fill available vertical space
+    const availableHeight = height - legendHeight - verticalPadding;
+    let cellHeight = (Number.isFinite(availableHeight) && availableHeight > 0 && visibleDayCount > 0)
+        ? (((availableHeight - 2) / Math.max(1, yearCount) - perYearFixed) / visibleDayCount)
+        : maxCell;
+    cellHeight = Math.max(minCell, Math.min(maxCell, cellHeight));
+    if (!Number.isFinite(cellHeight)) cellHeight = minCell;
+
+    return { cellWidth, cellHeight };
 }
 
 /**
@@ -502,7 +563,8 @@ function buildColorScale(
  */
 function pathMonth(
     t: Date,
-    cellSize: number,
+    cellWidth: number,
+    cellHeight: number,
     visibleDayCount: number,
     countDay: (i: number) => number,
     timeWeek: d3.CountableTimeInterval,
@@ -513,10 +575,10 @@ function pathMonth(
 
     // If the day is hidden or at position 0, draw a simple vertical line
     if (d <= 0) {
-        return `M${w * cellSize},0V${visibleDayCount * cellSize}`;
+        return `M${w * cellWidth},0V${visibleDayCount * cellHeight}`;
     }
 
-    return `M${(w + 1) * cellSize},0V${d * cellSize}H${w * cellSize}V${visibleDayCount * cellSize}`;
+    return `M${(w + 1) * cellWidth},0V${d * cellHeight}H${w * cellWidth}V${visibleDayCount * cellHeight}`;
 }
 
 /**
@@ -542,7 +604,7 @@ function buildTooltipContent(dp: CalendarDataPoint): string {
  * Render a color legend at the top of the chart.
  */
 function renderLegend(
-    svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
+    svg: d3.Selection<SVGGElement | SVGSVGElement, unknown, null, undefined>,
     values: number[],
     colorScale: (value: number) => string,
     config: CalendarConfig,
@@ -555,9 +617,10 @@ function renderLegend(
         return;
     }
 
-    const legendWidth = 200;
+    const legendWidth = Math.max(120, Math.min(200, Math.floor(config.width - 40)));
     const legendHeight = 12;
-    const legendX = Math.max(chartWidth, config.width) / 2 - legendWidth / 2;
+    // Center legend based on chart width (not container width, since mainG is centered)
+    const legendX = (chartWidth - legendWidth) / 2;
     const legendY = 4;
 
     const legendG = svg.append("g").attr("transform", `translate(${legendX}, ${legendY})`);
